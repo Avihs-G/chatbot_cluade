@@ -5,27 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Chat Bot — Website Builder</title>
     <style>
-      :root{--bg:#0f1720;--card:#0b1220;--user:#0b7cff;--ai:#2b6f44;--muted:#9aa7b2;color-scheme:dark}
-      body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#071026 0%, #07162b 100%);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-      .app{width:100%;max-width:900px;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,.6);overflow:hidden;display:flex;flex-direction:column}
-      header{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:center;gap:12px}
-      header h1{margin:0;font-size:16px;color:#e6eef6}
+      :root{--bg:#f6f8fb;--card:#ffffff;--user:#0b7cff;--ai:#dff4ea;--muted:#4b5563;color-scheme:light}
+      body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#ffffff 0%, #f6f8fb 100%);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+      .app{width:100%;max-width:900px;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(16,24,40,.06);overflow:hidden;display:flex;flex-direction:column}
+      header{padding:18px 20px;border-bottom:1px solid rgba(15,23,42,.06);display:flex;align-items:center;gap:12px}
+      header h1{margin:0;font-size:16px;color:#0f1720}
       header p{margin:0;color:var(--muted);font-size:13px}
       .chat{padding:20px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px}
-      .msg{max-width:82%;padding:12px 14px;border-radius:10px;color:#e6eef6;line-height:1.45}
-      .msg.user{margin-left:auto;background:linear-gradient(90deg,var(--user),#186de4)}
-      .msg.ai{margin-right:auto;background:linear-gradient(90deg,#123840,var(--ai))}
+      .msg{max-width:82%;padding:12px 14px;border-radius:10px;color:#0f1720;line-height:1.45;border:1px solid rgba(15,23,42,.06);background:#f8fafc}
+      .msg.user{margin-left:auto;background:linear-gradient(90deg,var(--user),#186de4);color:#fff}
+      .msg.ai{margin-right:auto;background:linear-gradient(90deg,#dff4ea,var(--ai));color:#0f1720}
       .meta{font-size:12px;color:var(--muted);margin-top:6px}
-      .input{display:flex;padding:12px;border-top:1px solid rgba(255,255,255,.03);gap:8px}
-      .input textarea{flex:1;min-height:48px;max-height:150px;padding:10px;border-radius:8px;border:none;background:rgba(255,255,255,.03);color:#e6eef6;font-size:14px;resize:vertical}
-      .btn{background:#0b1220;border:1px solid rgba(255,255,255,.04);color:#e6eef6;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+      .input{display:flex;padding:12px;border-top:1px solid rgba(15,23,42,.06);gap:8px;align-items:flex-end}
+      .input textarea{flex:1;min-height:48px;max-height:150px;padding:10px;border-radius:8px;border:1px solid rgba(15,23,42,.06);background:transparent;color:#0f1720;font-size:14px;resize:vertical}
+      .btn{background:var(--user);border:1px solid rgba(11,124,255,.15);color:#fff;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer}
       .small{font-size:13px;padding:8px 10px}
-      pre{background:#07121A;color:#cfeef5;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap}
+      pre{background:#f3f4f6;color:#0f1720;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap;border:1px solid rgba(15,23,42,.04)}
       .code-wrap{position:relative}
-      .copy-btn{position:absolute;right:8px;top:8px;border:none;background:rgba(0,0,0,.35);color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer}
-      .hint{padding:12px 18px;border-top:1px solid rgba(255,255,255,.03);color:var(--muted);font-size:13px}
+      .copy-btn{position:absolute;right:8px;top:8px;border:none;background:rgba(11,124,255,.9);color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer}
+      .hint{padding:12px 18px;border-top:1px solid rgba(15,23,42,.06);color:var(--muted);font-size:13px}
       .examples{display:flex;gap:8px}
-      .chip{background:rgba(255,255,255,.03);padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600}
+      .chip{background:rgba(15,23,42,.03);padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600}
     </style>
   </head>
   <body>
@@ -45,7 +45,10 @@
 
       <div class="input">
         <textarea id="input" placeholder="Describe the website or page you want (press Enter to send). e.g. 'Build a 3-page portfolio site with homepage, projects, contact pages'" rows="2"></textarea>
-        <button id="send" class="btn">Send</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:92px">
+          <div id="charCount" style="font-size:12px;color:var(--muted);">0 / 3000</div>
+          <button id="send" class="btn">Send</button>
+        </div>
       </div>
 
       <div class="hint">
@@ -67,9 +70,35 @@
       const sendBtn = document.getElementById('send');
       const clearBtn = document.getElementById('clear');
       const chips = document.querySelectorAll('.chip');
+      const charCountEl = document.getElementById('charCount');
+
+      function updateCharCount(){
+        const len = input.value.length;
+        charCountEl.textContent = `${len} / ${MAX_INPUT_CHARS}`;
+        if(len > MAX_INPUT_CHARS){
+          charCountEl.style.color = '#ef4444'; // red
+          sendBtn.disabled = true;
+          sendBtn.style.opacity = '0.6';
+        } else {
+          charCountEl.style.color = 'var(--muted)';
+          sendBtn.disabled = false;
+          sendBtn.style.opacity = '1';
+        }
+      }
+
+      // show a system-like AI message guiding the user to reduce the input
+      function showLengthWarning(){
+        addMessage('ai', `<div>⚠️ Your message exceeds the maximum allowed length of ${MAX_INPUT_CHARS} characters. Please shorten it or split it into multiple messages (send them one-by-one). I will wait for a shorter input to continue.</div><div class="meta">System</div>`);
+        input.focus();
+      }
+
+      input.addEventListener('input', updateCharCount);
+      // initialize display
+      updateCharCount();
 
       // A short prefatory instruction to guide the assistant when the user asks for "build" tasks
-      const systemPreface = `You are an expert web developer. When the user requests a website, respond with an overview of the suggested structure followed by the complete source code for each file. Use fenced code blocks (\`\`\`) with filenames or languages. Provide short explanations only when necessary.`;
+      const MAX_INPUT_CHARS = 3000; // configurable client-side limit
+      const systemPreface = `You are an expert web developer. When the user requests a website, respond with an overview of the suggested structure followed by the complete source code for each file. Use fenced code blocks (\`\`\`) with filenames or languages. If the user's message exceeds ${MAX_INPUT_CHARS} characters, do NOT attempt to generate the full answer; instead, reply with a short message asking the user to reduce or split the input into multiple parts so you can help iteratively.`;
 
       function escapeHtml(s){
         return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
@@ -87,11 +116,18 @@
       }
 
       async function handleSend(){
-        const text = input.value.trim();
+        const textRaw = input.value;
+        const text = textRaw.trim();
         if(!text) return;
+        // enforce client-side length limit
+        if(textRaw.length > MAX_INPUT_CHARS){
+          showLengthWarning();
+          return;
+        }
         // append user message
         addMessage('user', `<div>${escapeHtml(text)}</div><div class="meta">You</div>`);
         input.value = '';
+        updateCharCount();
 
         // prepare an AI message container
         const aiNode = addMessage('ai', `<div class="ai-content"></div>`);
@@ -203,6 +239,7 @@
       input.addEventListener('keydown', (e)=>{
         if(e.key === 'Enter' && !e.shiftKey){
           e.preventDefault();
+          if(input.value.length > MAX_INPUT_CHARS){ showLengthWarning(); return; }
           handleSend();
         }
       });
