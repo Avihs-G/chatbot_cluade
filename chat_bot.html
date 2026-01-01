@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat Bot — Website Builder</title>
+    <style>
+      :root{--bg:#0f1720;--card:#0b1220;--user:#0b7cff;--ai:#2b6f44;--muted:#9aa7b2;color-scheme:dark}
+      body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#071026 0%, #07162b 100%);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+      .app{width:100%;max-width:900px;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,.6);overflow:hidden;display:flex;flex-direction:column}
+      header{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:center;gap:12px}
+      header h1{margin:0;font-size:16px;color:#e6eef6}
+      header p{margin:0;color:var(--muted);font-size:13px}
+      .chat{padding:20px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px}
+      .msg{max-width:82%;padding:12px 14px;border-radius:10px;color:#e6eef6;line-height:1.45}
+      .msg.user{margin-left:auto;background:linear-gradient(90deg,var(--user),#186de4)}
+      .msg.ai{margin-right:auto;background:linear-gradient(90deg,#123840,var(--ai))}
+      .meta{font-size:12px;color:var(--muted);margin-top:6px}
+      .input{display:flex;padding:12px;border-top:1px solid rgba(255,255,255,.03);gap:8px}
+      .input textarea{flex:1;min-height:48px;max-height:150px;padding:10px;border-radius:8px;border:none;background:rgba(255,255,255,.03);color:#e6eef6;font-size:14px;resize:vertical}
+      .btn{background:#0b1220;border:1px solid rgba(255,255,255,.04);color:#e6eef6;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+      .small{font-size:13px;padding:8px 10px}
+      pre{background:#07121A;color:#cfeef5;padding:12px;border-radius:8px;overflow:auto;white-space:pre-wrap}
+      .code-wrap{position:relative}
+      .copy-btn{position:absolute;right:8px;top:8px;border:none;background:rgba(0,0,0,.35);color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer}
+      .hint{padding:12px 18px;border-top:1px solid rgba(255,255,255,.03);color:var(--muted);font-size:13px}
+      .examples{display:flex;gap:8px}
+      .chip{background:rgba(255,255,255,.03);padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600}
+    </style>
+  </head>
+  <body>
+    <div class="app" role="application" aria-label="Chat bot for website generation">
+      <header>
+        <div style="flex:1">
+          <h1>Website Builder Chat 🤖</h1>
+          <p>Type your requirements and the AI will respond with page code and explanations.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="clear" class="btn small">Clear</button>
+          <a class="btn small" href="index.php" style="text-decoration:none">Open Demo</a>
+        </div>
+      </header>
+
+      <div class="chat" id="chat"></div>
+
+      <div class="input">
+        <textarea id="input" placeholder="Describe the website or page you want (press Enter to send). e.g. 'Build a 3-page portfolio site with homepage, projects, contact pages'" rows="2"></textarea>
+        <button id="send" class="btn">Send</button>
+      </div>
+
+      <div class="hint">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="examples">
+            <div class="chip" data-example="A single-page product landing page with hero, features and signup form">Landing page</div>
+            <div class="chip" data-example="A portfolio site with home, projects, and contact pages. Minimal, responsive, and uses CSS Grid">Portfolio</div>
+            <div class="chip" data-example="A blog index and a post page with simple markdown rendering">Blog</div>
+          </div>
+          <small style="color:var(--muted)">Model: <strong>claude-sonnet-4.5</strong></small>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://js.puter.com/v2/"></script>
+    <script>
+      const chatEl = document.getElementById('chat');
+      const input = document.getElementById('input');
+      const sendBtn = document.getElementById('send');
+      const clearBtn = document.getElementById('clear');
+      const chips = document.querySelectorAll('.chip');
+
+      // A short prefatory instruction to guide the assistant when the user asks for "build" tasks
+      const systemPreface = `You are an expert web developer. When the user requests a website, respond with an overview of the suggested structure followed by the complete source code for each file. Use fenced code blocks (\`\`\`) with filenames or languages. Provide short explanations only when necessary.`;
+
+      function escapeHtml(s){
+        return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+      }
+
+      function addMessage(kind, htmlContent, opts={}){
+        const el = document.createElement('div');
+        el.className = 'msg ' + kind;
+        el.setAttribute('data-kind', kind);
+        // Accept htmlContent as already-safe HTML string (we escape where needed)
+        el.innerHTML = htmlContent;
+        chatEl.appendChild(el);
+        chatEl.scrollTop = chatEl.scrollHeight - chatEl.clientHeight;
+        return el;
+      }
+
+      async function handleSend(){
+        const text = input.value.trim();
+        if(!text) return;
+        // append user message
+        addMessage('user', `<div>${escapeHtml(text)}</div><div class="meta">You</div>`);
+        input.value = '';
+
+        // prepare an AI message container
+        const aiNode = addMessage('ai', `<div class="ai-content"></div>`);
+        const contentNode = aiNode.querySelector('.ai-content');
+
+        // create a small indicator
+        let typing = document.createElement('div');
+        typing.textContent = '⏳ Generating...';
+        typing.style.opacity = '0.6';
+        typing.style.marginTop = '6px';
+        contentNode.appendChild(typing);
+
+        // call puter.ai.chat with streaming
+        try{
+          const prompt = `${systemPreface}\n\nUser: ${text}`;
+          const chat_resp = await puter.ai.chat(prompt, { model: 'claude-sonnet-4.5', stream: true });
+
+          // Remove typing and instead stream content
+          contentNode.removeChild(typing);
+
+          // streaming: handle code fences
+          let inCode = false; // whether we are inside a code fence
+          let codeEl = null;
+          let codeLang = '';
+
+          for await (const part of chat_resp){
+            if(!part) continue;
+            const chunk = part?.text ?? '';
+            if(chunk.length === 0) continue;
+
+            // Simple parser for triple-backtick fences
+            let i = 0;
+            while(i < chunk.length){
+              // find next fence in the remainder
+              const fenceIndex = chunk.indexOf('```', i);
+              if(fenceIndex === -1){
+                // no more fences: append remainder to current mode
+                const textChunk = chunk.slice(i);
+                if(inCode){
+                  codeEl.textContent += textChunk; // preserve raw text
+                } else {
+                  // append escaped HTML with line breaks
+                  const escaped = escapeHtml(textChunk).replaceAll('\n','<br>');
+                  contentNode.insertAdjacentHTML('beforeend', escaped);
+                }
+                break;
+              }
+
+              // there is a fence
+              // append up to fence
+              const before = chunk.slice(i, fenceIndex);
+              if(before){
+                if(inCode) codeEl.textContent += before;
+                else contentNode.insertAdjacentHTML('beforeend', escapeHtml(before).replaceAll('\n','<br>'));
+              }
+
+              // toggle fence
+              // check if this is opening or closing by checking inCode
+              if(!inCode){
+                // opening: try to get language immediately after fence
+                const rest = chunk.slice(fenceIndex + 3);
+                const langMatch = rest.match(/^\s*([a-zA-Z0-9-]*)\s*\n?/);
+                codeLang = langMatch ? (langMatch[1] || '') : '';
+                // create code block
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-wrap';
+                codeEl = document.createElement('pre');
+                codeEl.className = 'code-block';
+                wrapper.appendChild(codeEl);
+                // add copy button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = 'Copy';
+                copyBtn.addEventListener('click', ()=>{navigator.clipboard.writeText(codeEl.textContent)});
+                wrapper.appendChild(copyBtn);
+                contentNode.appendChild(wrapper);
+                inCode = true;
+
+                // advance i past fence and optional language and newline
+                if(langMatch){
+                  i = fenceIndex + 3 + langMatch[0].length;
+                } else {
+                  i = fenceIndex + 3;
+                }
+              } else {
+                // closing fence: end code block
+                inCode = false;
+                codeEl = null;
+                codeLang = '';
+                i = fenceIndex + 3;
+              }
+            }
+
+            // keep scroll pinned to bottom while streaming
+            chatEl.scrollTop = chatEl.scrollHeight - chatEl.clientHeight;
+          }
+
+          // after streaming done, add small meta
+          contentNode.insertAdjacentHTML('beforeend', '<div class="meta">Claude Sonnet 4.5</div>');
+        }catch(err){
+          contentNode.insertAdjacentHTML('beforeend', `<div style="color:#ffb4b4">Error: ${escapeHtml(String(err))}</div>`);
+        }
+
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+
+      sendBtn.addEventListener('click', handleSend);
+
+      input.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' && !e.shiftKey){
+          e.preventDefault();
+          handleSend();
+        }
+      });
+
+      clearBtn.addEventListener('click', ()=>{chatEl.innerHTML=''});
+
+      chips.forEach(c => c.addEventListener('click', ()=>{input.value = c.dataset.example; input.focus();}));
+
+      // small accessibility helper: focus input on page load
+      window.addEventListener('load', ()=>input.focus());
+    </script>
+  </body>
+</html>
