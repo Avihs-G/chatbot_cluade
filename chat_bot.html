@@ -70,6 +70,7 @@
       const sendBtn = document.getElementById('send');
       const clearBtn = document.getElementById('clear');
       const chips = document.querySelectorAll('.chip');
+      const MAX_INPUT_CHARS = 3000; // configurable client-side limit
       const charCountEl = document.getElementById('charCount');
 
       function updateCharCount(){
@@ -97,7 +98,6 @@
       updateCharCount();
 
       // A short prefatory instruction to guide the assistant when the user asks for "build" tasks
-      const MAX_INPUT_CHARS = 3000; // configurable client-side limit
       const systemPreface = `You are an expert web developer. When the user requests a website, respond with an overview of the suggested structure followed by the complete source code for each file. Use fenced code blocks (\`\`\`) with filenames or languages. If the user's message exceeds ${MAX_INPUT_CHARS} characters, do NOT attempt to generate the full answer; instead, reply with a short message asking the user to reduce or split the input into multiple parts so you can help iteratively.`;
 
       function escapeHtml(s){
@@ -152,11 +152,20 @@
           let inCode = false; // whether we are inside a code fence
           let codeEl = null;
           let codeLang = '';
+          let stopStreaming = false;
 
           for await (const part of chat_resp){
             if(!part) continue;
             const chunk = part?.text ?? '';
             if(chunk.length === 0) continue;
+
+            // simple heuristic: if the model signals a context/window/token limit, stop and ask the user to shorten
+            const low = chunk.toLowerCase();
+            if(!inCode && (low.includes('exceed') || low.includes('exceeded') || low.includes('too long') || (low.includes('token') && low.includes('limit')) || low.includes('context'))){
+              contentNode.insertAdjacentHTML('beforeend', `<div style="color:#b45309">⚠️ The assistant indicates the message is too long or exceeded limits. Please shorten your input or split it into multiple messages and try again.</div>`);
+              stopStreaming = true;
+              break;
+            }
 
             // Simple parser for triple-backtick fences
             let i = 0;
@@ -225,8 +234,12 @@
             chatEl.scrollTop = chatEl.scrollHeight - chatEl.clientHeight;
           }
 
-          // after streaming done, add small meta
-          contentNode.insertAdjacentHTML('beforeend', '<div class="meta">Claude Sonnet 4.5</div>');
+          // after streaming done, add small meta (unless we stopped due to limits)
+          if(stopStreaming){
+            contentNode.insertAdjacentHTML('beforeend', '<div class="meta">Stopped — reduce your input and retry</div>');
+          } else {
+            contentNode.insertAdjacentHTML('beforeend', '<div class="meta">Claude Sonnet 4.5</div>');
+          }
         }catch(err){
           contentNode.insertAdjacentHTML('beforeend', `<div style="color:#ffb4b4">Error: ${escapeHtml(String(err))}</div>`);
         }

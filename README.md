@@ -17,5 +17,6 @@ Usage
 Notes
 - This is a demo for prototyping and learning how to build conversational UIs; secure keys and production integration are not included.
 - The UI uses `https://js.puter.com/v2/` as in `index.php` to reach the AI model.
+- The chat UI enforces a client-side input limit of 3000 characters and will prompt you to shorten or split long inputs to avoid hitting model limits. The theme is now a light theme by default.
 
 Feel free to open `chat_bot.html` and try example prompts — the assistant will return page code and short explanations.
