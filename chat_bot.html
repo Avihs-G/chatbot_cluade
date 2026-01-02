@@ -159,9 +159,9 @@
             const chunk = part?.text ?? '';
             if(chunk.length === 0) continue;
 
-            // simple heuristic: if the model signals a context/window/token limit, stop and ask the user to shorten
+              // heuristic: detect explicit signals about limits (more conservative than matching a single common word)
             const low = chunk.toLowerCase();
-            if(!inCode && (low.includes('exceed') || low.includes('exceeded') || low.includes('too long') || (low.includes('token') && low.includes('limit')) || low.includes('context'))){
+            if(!inCode && (low.includes('exceed') || low.includes('exceeded') || low.includes('too long') || low.includes('token limit') || low.includes('context window') || low.includes('context length') || (low.includes('token') && low.includes('limit')))){
               contentNode.insertAdjacentHTML('beforeend', `<div style="color:#b45309">⚠️ The assistant indicates the message is too long or exceeded limits. Please shorten your input or split it into multiple messages and try again.</div>`);
               stopStreaming = true;
               break;
@@ -241,6 +241,8 @@
             contentNode.insertAdjacentHTML('beforeend', '<div class="meta">Claude Sonnet 4.5</div>');
           }
         }catch(err){
+          // Ensure typing indicator is cleared on errors
+          try{ if(contentNode.contains(typing)) contentNode.removeChild(typing); }catch(e){}
           contentNode.insertAdjacentHTML('beforeend', `<div style="color:#ffb4b4">Error: ${escapeHtml(String(err))}</div>`);
         }
 
